@@ -3,3 +3,5 @@
 *.json
 .streamlit/
 *.toml
+.DS_Store
+__pycache__/

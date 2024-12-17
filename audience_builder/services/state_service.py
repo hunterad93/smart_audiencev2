@@ -1,6 +1,6 @@
 import streamlit as st
 import uuid
-from src.services.openai_service import OpenAIService
+from services.openai_service import OpenAIService
 import logging
 
 logger = logging.getLogger(__name__)

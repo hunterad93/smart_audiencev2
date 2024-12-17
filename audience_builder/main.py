@@ -1,8 +1,8 @@
 import streamlit as st
-from src.services.state_service import StateService
-from src.services.openai_service import OpenAIService
-from src.components.sidebar import render_sidebar
-from src.components.chat import render_group_chat
+from services.state_service import StateService
+from services.openai_service import OpenAIService
+from components.sidebar import render_sidebar
+from components.chat import render_group_chat
 import logging
 
 def setup_logging():
@@ -14,7 +14,7 @@ def setup_logging():
     )
     
     # Set our app's logger to DEBUG
-    logger = logging.getLogger('src')
+    logger = logging.getLogger('audience_builder')
     logger.setLevel(logging.DEBUG)
     
     # Quiet down noisy loggers

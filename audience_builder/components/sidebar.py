@@ -1,6 +1,6 @@
 import streamlit as st
-from src.services.state_service import StateService
-from src.services.openai_service import OpenAIService
+from services.state_service import StateService
+from services.openai_service import OpenAIService
 import logging
 
 logger = logging.getLogger(__name__)

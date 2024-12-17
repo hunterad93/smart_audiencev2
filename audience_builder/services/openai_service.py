@@ -4,9 +4,9 @@ import logging
 from openai import OpenAI
 import streamlit as st
 import json
-from src.models.classification import GroupClassification, AudienceType
-from src.settings.prompts import CLASSIFICATION_PROMPT
-from src.services.segment_service import SegmentService
+from models.classification import GroupClassification, AudienceType
+from services.segment_service import SegmentService
+from settings.prompts import CLASSIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
 

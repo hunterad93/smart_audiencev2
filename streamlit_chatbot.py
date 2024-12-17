@@ -18,7 +18,7 @@ def initialize_state():
 
 def create_new_group():
     group_id = str(uuid.uuid4())
-    client = OpenAI()
+    client = OpenAI(api_key=st.secrets["openai_api_key"])
     thread_id = client.beta.threads.create().id
     
     st.session_state.group_threads[group_id] = thread_id
@@ -95,12 +95,12 @@ def render_group_chat():
         handle_chat_input(prompt, thread_id, group)
 
 def get_thread_messages(thread_id):
-    client = OpenAI()
+    client = OpenAI(api_key=st.secrets["openai_api_key"])
     messages = client.beta.threads.messages.list(thread_id=thread_id)
     return [{"role": m.role, "content": m.content[0].text.value} for m in messages.data]
 
 def handle_chat_input(prompt, thread_id, group):
-    client = OpenAI()
+    client = OpenAI(api_key=st.secrets["openai_api_key"])
     
     with st.chat_message("user"):
         st.markdown(prompt)

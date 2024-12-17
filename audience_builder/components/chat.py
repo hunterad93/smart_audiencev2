@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 def render_group_chat(openai_service: OpenAIService):
     if not st.session_state.active_group_id:
-        st.info("Select a group from the sidebar or create a new one")
+        st.info("Select a data group from the sidebar or create a new one")
         return
     
     group_id = st.session_state.active_group_id
@@ -20,12 +20,12 @@ def render_group_chat(openai_service: OpenAIService):
         display_group_definition(f"```json\n{json.dumps(group, indent=2)}\n```", group)
     
     # Chat input and message handling
-    if prompt := st.chat_input("Describe your audience segment..."):
+    if prompt := st.chat_input("Describe your data group..."):
         with st.chat_message("user"):
             st.markdown(prompt)
             
         with st.chat_message("assistant"):
-            with st.spinner("Analyzing your audience..."):
+            with st.spinner("Analyzing your input..."):
                 if not group["assistant_id"]:
                     # First message - classify and potentially create demographic thread
                     classification, segments = openai_service.classify_data_group(prompt)

@@ -5,8 +5,10 @@ from openai import OpenAI
 import streamlit as st
 import json
 from models.classification import GroupClassification, AudienceType
+from models.audience import DataGroupDefinition, AudienceStructure
 from services.segment_service import SegmentService
-from settings.prompts import CLASSIFICATION_PROMPT
+from settings.prompts import CLASSIFICATION_PROMPT, AUDIENCE_STRUCTURE_PROMPT
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +20,16 @@ class OpenAIService:
         self.classification_model = "gpt-4o"
         
         # Assistant IDs
-        self.demographic_assistant_id = "asst_bvWOWqZ7myFeBsmuEQMdRcLs"
-        self.general_assistant_id = "asst_KFSoUugvWdugdeLCrpNYlStD"
+        self.acuity_demo_assistant_id = "asst_xic9sXnfwSoTM6kqAURpS0ua"
+        self.alliance_demo_assistant_id = "asst_3pONropmZvHLJQSCCg6vnuzo"
+        self.acuity_assistant_id = "asst_xic9sXnfwSoTM6kqAURpS0ua"
+        self.alliance_assistant_id = "asst_3pONropmZvHLJQSCCg6vnuzo"
+
+        # KPI groupings
+        self.conversion_kpis = {'CPA', 'CPL', 'CPCV', 'CPSV', 'Conversion Count', 'ROAS', 'CPC'}
+        self.ctr_kpis = {'CTR'}
+        self.viewability_kpis = {'CPM', 'Viewability', 'Video Completion Rate'}
+        
         logger.info("OpenAIService initialized with models and assistants configured")
     
     def get_structured_completion(
@@ -135,7 +145,7 @@ class OpenAIService:
                 model=self.classification_model,
                 messages=messages,
                 response_format=GroupClassification,
-                temperature=0.3
+                temperature=0.0
             )
             
             # If it's a demographic classification, get segments immediately
@@ -156,15 +166,23 @@ class OpenAIService:
                 split_recommended=False
             ), None
     
-    def get_assistant_for_classification(self, classification: GroupClassification) -> str:
-        logger.debug(f"Selecting assistant for classification: {classification}")
-        assistant_id = (
-            self.demographic_assistant_id 
-            if classification.audience_type in [AudienceType.AGE_RANGE, AudienceType.GENDER]
-            else self.general_assistant_id
-        )
-        logger.info(f"Selected assistant: {assistant_id}")
-        return assistant_id
+    def get_assistant_for_classification(self, classification: GroupClassification, kpi_metric: str = None) -> str:
+        logger.debug(f"Selecting assistant for classification: {classification} and KPI: {kpi_metric}")
+        
+        # First check demographic-based routing
+        if classification.audience_type in [AudienceType.AGE_RANGE, AudienceType.GENDER]:
+            logger.info("Using demographic assistant")
+            return self.acuity_assistant_id
+            
+        # Then check KPI-based routing
+        if kpi_metric:
+            if kpi_metric in self.conversion_kpis:
+                logger.info("Using Alliance assistant for conversion metrics")
+                return self.alliance_assistant_id
+            
+        # Default to Acuity assistant for CTR, viewability, and any other cases
+        logger.info("Using default Acuity assistant")
+        return self.acuity_assistant_id
     
     def create_demographic_thread(self, user_prompt: str, segments: dict) -> str:
         try:
@@ -192,3 +210,88 @@ class OpenAIService:
         except Exception as e:
             logger.error(f"Error creating demographic thread: {str(e)}")
             raise
+
+    def structure_audience(self, audience_description: str) -> AudienceStructure:
+        logger.info("Starting audience structuring")
+        logger.debug(f"Input description: {audience_description}")
+        logger.debug(f"Selected KPI: {st.session_state.selected_kpi}")
+        
+        # Get structured groups from GPT
+        structured_groups = self.get_structured_completion(
+            model=self.classification_model,
+            messages=[
+                {"role": "system", "content": AUDIENCE_STRUCTURE_PROMPT},
+                {"role": "user", "content": audience_description}
+            ],
+            response_format=AudienceStructure
+        )
+        
+        # For each group, create a thread and store it
+        for group in structured_groups.data_groups:
+            group_id = str(uuid.uuid4())
+            thread_id = self.create_thread()
+            
+            # First classify the group to determine assistant
+            classification, segments = self.classify_data_group(group.description)
+            
+            # Get appropriate assistant based on classification and KPI
+            assistant_id = self.get_assistant_for_classification(
+                classification=classification,
+                kpi_metric=st.session_state.selected_kpi
+            )
+            
+            # Store initial message in thread
+            response = self.send_assistant_message(
+                thread_id=thread_id,
+                content=group.description,
+                assistant_id=assistant_id
+            )
+            
+            # Update state
+            st.session_state.group_threads[group_id] = thread_id
+            st.session_state.audience["data_groups"][group_id] = {
+                "thread_id": thread_id,
+                "status": "include",
+                "group_name": group.name,
+                "segments": [],
+                "assistant_id": assistant_id,
+                "classification": classification.model_dump() if classification else None
+            }
+            
+            # If we got segments from classification, update the group
+            if segments:
+                st.session_state.audience["data_groups"][group_id].update(segments)
+            
+            logger.info(f"Created group {group_id} with assistant {assistant_id}")
+        
+        return structured_groups
+
+    def process_data_groups(self, audience_structure: AudienceStructure) -> dict:
+        """Takes structured data groups and processes each through appropriate assistant"""
+        results = {}
+        
+        for group in audience_structure.data_groups:
+            group_id = str(uuid.uuid4())
+            classification, segments = self.classify_data_group(group.description)
+            
+            assistant_id = self.get_assistant_for_classification(
+                classification=classification,
+                kpi_metric=st.session_state.selected_kpi
+            )
+            
+            thread_id = self.create_thread()
+            response = self.send_assistant_message(
+                thread_id=thread_id,
+                content=group.description,
+                assistant_id=assistant_id
+            )
+            
+            results[group_id] = {
+                "thread_id": thread_id,
+                "assistant_id": assistant_id,
+                "classification": classification.model_dump() if classification else None,
+                "response": response,
+                "segments": segments if segments else []
+            }
+        
+        return results

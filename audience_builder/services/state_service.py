@@ -17,6 +17,8 @@ class StateService:
             st.session_state.active_group_id = None
         if "group_threads" not in st.session_state:
             st.session_state.group_threads = {}
+        if 'selected_kpi' not in st.session_state:
+            st.session_state.selected_kpi = None
         logger.info("=== Current State ===")
         logger.info(f"Audience: {st.session_state.audience}")
         logger.info(f"Active Group: {st.session_state.active_group_id}")

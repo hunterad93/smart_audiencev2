@@ -95,15 +95,20 @@ def display_group_definition(response_text: str, group: dict) -> None:
             response_text = response_text.split('```json\n')[1].split('```')[0]
         
         group_data = json.loads(response_text)
+        
+        # Log the segment structure
+        logger.debug(f"Parsed segment data: {json.dumps(group_data.get('segments', []), indent=2)}")
+        
         group.update(group_data)
         st.session_state.audience["data_groups"][st.session_state.active_group_id].update(group_data)
         
         # Compact display
         st.markdown(f"### {group_data['group_name']}")
-        for i, segment in enumerate(group_data['segments']):
+        for segment in group_data['segments']:
             st.markdown(
                 f"**{segment['full_path']}**\n\n"
-                f"{segment['description']}"
+                f"{segment['description']}\n\n"
+                f"ID: `{segment.get('id', 'Not specified')}`"
             )
             
     except Exception as e:

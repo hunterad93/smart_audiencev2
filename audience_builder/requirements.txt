@@ -1,3 +1,4 @@
 openai
 streamlit
 uuid
+-e git+https://github.com/hunterad93/TTD-SDK.git@main#egg=ttd_sdk

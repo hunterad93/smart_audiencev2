@@ -3,10 +3,11 @@ from services.state_service import StateService
 from services.openai_service import OpenAIService
 from components.chat import display_group_definition  # Import the display function
 import logging
+from services.ttd_interface import TTDInterfaceService
 
 logger = logging.getLogger(__name__)
 
-def render_sidebar(state_service: StateService, openai_service: OpenAIService):
+def render_sidebar(state_service: StateService, openai_service: OpenAIService, ttd_service: TTDInterfaceService):
     logger.debug(f"Session state at start: {st.session_state}")
     
     with st.sidebar:
@@ -16,12 +17,12 @@ def render_sidebar(state_service: StateService, openai_service: OpenAIService):
         if "selected_kpi" not in st.session_state:
             st.session_state.selected_kpi = None
         
-        # Advertiser ID input - show this first
-        advertiser_id = st.text_input(
+        # Show fixed advertiser ID as read-only
+        st.text_input(
             "Advertiser ID",
-            key="advertiser_id",
-            help="Enter the TradeDesk Advertiser ID",
-            placeholder="e.g., 8vad7yi"
+            value=ttd_service.FIXED_ADVERTISER_ID,
+            disabled=True,
+            help="Fixed TradeDesk Advertiser ID for safety"
         )
         
         st.divider()
@@ -98,21 +99,23 @@ def render_sidebar(state_service: StateService, openai_service: OpenAIService):
             # After all group management UI, add Push button
             st.divider()
             
-            # Enable push button only if we have advertiser ID and at least one group
-            can_push = (st.session_state.get('advertiser_id') and 
-                       st.session_state.audience.get('data_groups'))
+            # Update the Push button section
+            can_push = bool(st.session_state.audience.get('data_groups'))
             
             if st.button("Push to TradeDesk", 
                         use_container_width=True,
                         disabled=not can_push):
-                # TODO: Implement push functionality
-                pass
+                with st.spinner("Pushing audience to TradeDesk..."):
+                    success, audience_id = ttd_service.push_audience(st.session_state.audience)
+                    if success and audience_id:
+                        st.success("✅ Audience successfully pushed to TTD!")
+                        ttd_url = f"https://desk.thetradedesk.com/app/advertiser/{ttd_service.FIXED_ADVERTISER_ID}/data/audience/{audience_id}/details"
+                        st.markdown(f"[View in TradeDesk]({ttd_url}) ↗️")
+                    else:
+                        st.error("❌ Failed to push audience to TTD")
             
             if not can_push:
-                if not st.session_state.get('advertiser_id'):
-                    st.caption("⚠️ Enter Advertiser ID to push")
-                elif not st.session_state.audience.get('data_groups'):
-                    st.caption("⚠️ Create at least one group to push")
+                st.caption("⚠️ Create at least one group to push")
 
 def render_group_list(openai_service: OpenAIService):
     for group_id, group in st.session_state.audience["data_groups"].items():
